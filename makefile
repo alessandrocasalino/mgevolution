@@ -1,7 +1,7 @@
 # programming environment
-COMPILER     := mpic++
-INCLUDE      := # add the path to LATfield2 and other libraries (if necessary)
-LIB          := -lfftw3 -lm -lhdf5 -lgsl -lgslcblas
+COMPILER     := mpic++ -lmpi
+INCLUDE      := -L/Users/alessandrocasalino/Software/hi_class_public -I/Users/alessandrocasalino/Software/hi_class_public/include -I/Users/alessandrocasalino/Software/hi_class_public/source -L/usr/local/Cellar/hdf5/1.12.0/lib -I/usr/local/Cellar/hdf5/1.12.0/include -I/Users/alessandrocasalino/Software/LATfield2# add the path to LATfield2 and other libraries (if necessary)
+LIB          := -lfftw3 -lm -lhdf5 -lgsl -lgslcblas -lclass
 HPXCXXLIB    := -lhealpix_cxx -lcfitsio
 
 # target and source
@@ -27,18 +27,21 @@ DGEVOLUTION  += -DEXACT_OUTPUT_REDSHIFTS
 #DGEVOLUTION  += -DHAVE_CLASS    # requires LIB -lclass
 #DGEVOLUTION  += -DHAVE_HEALPIX  # requires LIB -lchealpix
 
+# MG module
+DGEVOLUTION  += -DMG		# enable MG module
+DGEVOLUTION  += -DMGVERBOSE	# enable MG verbose logs
+
 # further compiler options
 OPT          := -O3 -std=c++11
 
 $(EXEC): $(SOURCE) $(HEADERS) makefile
 	$(COMPILER) $< -o $@ $(OPT) $(DLATFIELD2) $(DGEVOLUTION) $(INCLUDE) $(LIB)
-	
+
 lccat: lccat.cpp
 	$(COMPILER) $< -o $@ $(OPT) $(DGEVOLUTION) $(INCLUDE)
-	
+
 lcmap: lcmap.cpp
 	$(COMPILER) $< -o $@ $(OPT) -fopenmp $(DGEVOLUTION) $(INCLUDE) $(LIB) $(HPXCXXLIB)
 
 clean:
 	-rm -f $(EXEC) lccat lcmap
-
