@@ -177,27 +177,6 @@ int main(int argc, char **argv)
 		parallel.abortForce();
 	}
 
-	#ifdef MG
-
-		COUT << " mgevolution module called." << endl;
-
-		mg_cosmology mg_cosmo;
-		mg_import(&mg_cosmo);
-
-		if( mg_cosmo.a.size() > 0 ){
-			COUT << " File correctly imported." << endl;
-			#ifdef MGVERBOSE
-			COUT << " Size of vector: " << mg_cosmo.a.size() << endl;
-			#endif
-		}
-		else{
-			COUT << " mgevolution ERROR: mgevolution called without background file. Check the existance of mg_bk.csv." << endl;
-			exit(-1000);
-		}
-
-		COUT << "\n";
-	#endif
-
 	COUT << " initializing..." << endl;
 
 	start_time = MPI_Wtime();
@@ -308,7 +287,61 @@ int main(int argc, char **argv)
 
 	fourpiG = 1.5 * sim.boxsize * sim.boxsize / C_SPEED_OF_LIGHT / C_SPEED_OF_LIGHT;
 	a = 1. / (1. + sim.z_in);
+
+	#ifdef MG
+
+		COUT << endl << " mgevolution module called." << endl;
+
+		// Defining the structure for mg computations
+		mg_cosmology mg_cosmo;
+
+		// Calling function to import mg background data and testing the correct import
+		if( mg_import(a, fourpiG, &mg_cosmo, "mg_bk.csv") ){
+			COUT << " File correctly imported." << endl;
+			#ifdef MGVERBOSE
+			COUT << " Size of vector: " << mg_cosmo.a_vec.size() << endl;
+			#endif
+
+			// Definitions for interpolation (spline method), with accelerators
+			mg_cosmo.acc_H = gsl_interp_accel_alloc();
+			mg_cosmo.spline_H = gsl_spline_alloc(gsl_interp_cspline,mg_cosmo.last_int);
+			mg_cosmo.acc_particleHorizon = gsl_interp_accel_alloc();
+	    mg_cosmo.spline_particleHorizon = gsl_spline_alloc(gsl_interp_cspline,mg_cosmo.last_int);
+			mg_cosmo.acc_mg_field = gsl_interp_accel_alloc();
+	    mg_cosmo.spline_mg_field = gsl_spline_alloc(gsl_interp_cspline,mg_cosmo.last_int);
+	    mg_cosmo.acc_mg_field_p = gsl_interp_accel_alloc();
+	    mg_cosmo.spline_mg_field_p = gsl_spline_alloc(gsl_interp_cspline,mg_cosmo.last_int);
+
+			// Initialization of interpolation structures
+			gsl_spline_init(mg_cosmo.spline_H,mg_cosmo.a,mg_cosmo.H,mg_cosmo.last_int);
+			gsl_spline_init(mg_cosmo.spline_particleHorizon,mg_cosmo.a,mg_cosmo.particleHorizon,mg_cosmo.last_int);
+	    gsl_spline_init(mg_cosmo.spline_mg_field,mg_cosmo.a,mg_cosmo.mg_field,mg_cosmo.last_int);
+	    gsl_spline_init(mg_cosmo.spline_mg_field_p,mg_cosmo.a,mg_cosmo.mg_field_p,mg_cosmo.last_int);
+
+			// Small test
+			#ifdef MGVERBOSE
+			double a_eval = 1e-1;
+			COUT << "interpolation test" <<endl;
+	    COUT << "spline eval:" << a_eval << " " << gsl_spline_eval(mg_cosmo.spline_mg_field,a_eval,mg_cosmo.acc_mg_field) << endl;
+	    COUT << "spline eval:" << a_eval << " " << gsl_spline_eval(mg_cosmo.spline_mg_field_p,a_eval,mg_cosmo.acc_mg_field_p) << endl;
+	    COUT << "spline eval:" << a_eval << " " << gsl_spline_eval(mg_cosmo.spline_H,a_eval,mg_cosmo.acc_H) << endl;
+	    COUT << "spline eval:" << a_eval << " " << gsl_spline_eval(mg_cosmo.spline_particleHorizon,a_eval,mg_cosmo.acc_particleHorizon) << endl;
+	    COUT << mg_cosmo.last_int << mg_cosmo.particleHorizon[gsl_interp_bsearch(mg_cosmo.a,a_eval,0,mg_cosmo.last_int-1)] << endl;
+			#endif
+
+		}
+		// If the import function fails, interrupt the software
+		else{
+			COUT << " mgevolution ERROR: mgevolution called without background file. Check the existance of the file." << endl;
+			exit(-1000);
+		}
+
+		COUT << endl;
+
+	#endif
+
 	tau = particleHorizon(a, fourpiG, cosmo);
+	COUT << tau << gsl_spline_eval(mg_cosmo.spline_particleHorizon,a,mg_cosmo.acc_particleHorizon) << endl;
 
 	if (sim.Cf * dx < sim.steplimit / Hconf(a, fourpiG, cosmo))
 		dtau = sim.Cf * dx;
@@ -908,6 +941,16 @@ int main(int argc, char **argv)
 #ifdef HAVE_CLASS
 	if (sim.radiation_flag > 0 || sim.fluid_flag > 0)
 		freeCLASSstructures(class_background, class_thermo, class_perturbs);
+#endif
+
+#ifdef MG
+	gsl_spline_free(mg_cosmo.spline_mg_field);gsl_interp_accel_free(mg_cosmo.acc_mg_field);
+	gsl_spline_free(mg_cosmo.spline_mg_field_p);gsl_interp_accel_free(mg_cosmo.acc_mg_field_p);
+	gsl_spline_free(mg_cosmo.spline_H);gsl_interp_accel_free(mg_cosmo.acc_H);
+	gsl_spline_free(mg_cosmo.spline_particleHorizon);gsl_interp_accel_free(mg_cosmo.acc_particleHorizon);
+	#ifdef MGVERBOSE
+		COUT << endl << "mg interpolation structures correctly deallocated" << endl;
+	#endif
 #endif
 
 #ifdef BENCHMARK
