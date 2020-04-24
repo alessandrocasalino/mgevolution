@@ -91,9 +91,9 @@ bool mg_import(const double a_in, const double fourpiG, mg_cosmology * mg_cosmo,
     // Defining the pointers to standard arrays
     mg_cosmo->a = &mg_cosmo->a_vec[0];
     mg_cosmo->H = &mg_cosmo->H_vec[0];
+    mg_cosmo->particleHorizon = &mg_cosmo->particleHorizon_vec[0];
     mg_cosmo->mg_field = &mg_cosmo->mg_field_vec[0];
     mg_cosmo->mg_field_p = &mg_cosmo->mg_field_p_vec[0];
-    mg_cosmo->particleHorizon = &mg_cosmo->particleHorizon_vec[0];
 
     // Check if the import is good
     if ( mg_cosmo->a_vec.size() > 0 && mg_cosmo->a_vec.size() == mg_cosmo->H_vec.size() && mg_cosmo->a_vec.size() == mg_cosmo->particleHorizon_vec.size() && mg_cosmo->a_vec.size() == mg_cosmo->mg_field_vec.size() && mg_cosmo->a_vec.size() == mg_cosmo->mg_field_p_vec.size()) {

@@ -64,7 +64,7 @@
 #endif
 
 #ifdef MG
-#include "mg.hpp"
+#include "mg/mg.hpp"
 #endif
 
 using namespace std;
@@ -321,12 +321,12 @@ int main(int argc, char **argv)
 			// Small test
 			#ifdef MGVERBOSE
 			double a_eval = 1e-1;
-			COUT << "interpolation test" <<endl;
-	    COUT << "spline eval:" << a_eval << " " << gsl_spline_eval(mg_cosmo.spline_mg_field,a_eval,mg_cosmo.acc_mg_field) << endl;
-	    COUT << "spline eval:" << a_eval << " " << gsl_spline_eval(mg_cosmo.spline_mg_field_p,a_eval,mg_cosmo.acc_mg_field_p) << endl;
-	    COUT << "spline eval:" << a_eval << " " << gsl_spline_eval(mg_cosmo.spline_H,a_eval,mg_cosmo.acc_H) << endl;
-	    COUT << "spline eval:" << a_eval << " " << gsl_spline_eval(mg_cosmo.spline_particleHorizon,a_eval,mg_cosmo.acc_particleHorizon) << endl;
-	    COUT << mg_cosmo.last_int << mg_cosmo.particleHorizon[gsl_interp_bsearch(mg_cosmo.a,a_eval,0,mg_cosmo.last_int-1)] << endl;
+			COUT << " interpolation test" <<endl;
+	    COUT << " spline eval:" << a_eval << " " << gsl_spline_eval(mg_cosmo.spline_mg_field,a_eval,mg_cosmo.acc_mg_field) << endl;
+	    COUT << " spline eval:" << a_eval << " " << gsl_spline_eval(mg_cosmo.spline_mg_field_p,a_eval,mg_cosmo.acc_mg_field_p) << endl;
+	    COUT << " spline eval:" << a_eval << " " << gsl_spline_eval(mg_cosmo.spline_H,a_eval,mg_cosmo.acc_H) << endl;
+	    COUT << " spline eval:" << a_eval << " " << gsl_spline_eval(mg_cosmo.spline_particleHorizon,a_eval,mg_cosmo.acc_particleHorizon) << endl;
+	    COUT << mg_cosmo.last_int << " " << mg_cosmo.particleHorizon[gsl_interp_bsearch(mg_cosmo.a,a_eval,0,mg_cosmo.last_int)] << endl;
 			#endif
 
 		}
@@ -341,7 +341,12 @@ int main(int argc, char **argv)
 	#endif
 
 	tau = particleHorizon(a, fourpiG, cosmo);
-	COUT << tau << gsl_spline_eval(mg_cosmo.spline_particleHorizon,a,mg_cosmo.acc_particleHorizon) << endl;
+
+	#ifdef MG
+	#ifdef MGVERBOSE
+	COUT << " mgevolution VERBOSE: particle horizon check at z_in: " << tau << " , while mg value " << gsl_spline_eval(mg_cosmo.spline_particleHorizon,a,mg_cosmo.acc_particleHorizon) << endl << endl;
+	#endif
+	#endif
 
 	if (sim.Cf * dx < sim.steplimit / Hconf(a, fourpiG, cosmo))
 		dtau = sim.Cf * dx;
