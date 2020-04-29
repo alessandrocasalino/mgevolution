@@ -1,7 +1,7 @@
 # programming environment
-COMPILER     := mpic++ -lmpi
-INCLUDE      := -L/Users/alessandrocasalino/Software/hi_class_public -I/Users/alessandrocasalino/Software/hi_class_public/include -I/Users/alessandrocasalino/Software/hi_class_public/source -L/usr/local/Cellar/hdf5/1.12.0/lib -I/usr/local/Cellar/hdf5/1.12.0/include -I/Users/alessandrocasalino/Software/LATfield2# add the path to LATfield2 and other libraries (if necessary)
-LIB          := -lfftw3 -lm -lhdf5 -lgsl -lgslcblas -lclass
+COMPILER     := mpic++
+INCLUDE      := -L/Users/alessandrocasalino/Software/class_public -I/Users/alessandrocasalino/Software/class_public/include -I/Users/alessandrocasalino/Software/class_public/source -L/usr/local/Cellar/hdf5/1.12.0/lib -I/usr/local/Cellar/hdf5/1.12.0/include -I/Users/alessandrocasalino/Software/LATfield2# add the path to LATfield2 and other libraries (if necessary)
+LIB          := -lmpi -lfftw3 -lm -lhdf5 -lgsl -lgslcblas -lclass
 HPXCXXLIB    := -lhealpix_cxx -lcfitsio
 
 # target and source
@@ -24,7 +24,7 @@ DGEVOLUTION  += -DEXACT_OUTPUT_REDSHIFTS
 #DGEVOLUTION  += -DVELOCITY      # enables velocity field utilities
 #DGEVOLUTION  += -DCOLORTERMINAL
 #DGEVOLUTION  += -DCHECK_B
-#DGEVOLUTION  += -DHAVE_CLASS    # requires LIB -lclass
+DGEVOLUTION  += -DHAVE_CLASS    # requires LIB -lclass
 #DGEVOLUTION  += -DHAVE_HEALPIX  # requires LIB -lchealpix
 
 # MG module

@@ -16,6 +16,8 @@
 // INITIAL CONDITIONS
 // Initial value of the scale factor
 double a_init = 1e-15;
+// Final value of the scale factor
+double a_end = 1.1;
 
 // Values of fractional density for the cosmological matter today
 double Omega_rad_0 = 8e-5;
@@ -136,7 +138,7 @@ void csv(double * t, double * a, double * a_p, double * mg_field_bk, double * mg
 
     double H_test, H_cosmo = 0.;
 
-    while( a[i] <= 1.0){
+    while( a[i] <= a_end){
 
       double H = Hconf(a[i],mg_field_bk[i],mg_field_p_bk[i]); // this is the Hubble constant with conformal time
       double H_cosmo = H / a[i];
@@ -163,7 +165,7 @@ void csv(double * t, double * a, double * a_p, double * mg_field_bk, double * mg
 
       fprintf(fp, "\n");
 
-      if(a[i+csv_resolution]<= 1.0){
+      if(a[i+csv_resolution]<= a_end){
         i=i+csv_resolution;
       }
       else{
@@ -180,7 +182,7 @@ int scan_for_a0 (double * a) {
 
   int i=0;
 
-  for(i=0;a[i] <= 1.0;i++);
+  for(i=0; a[i] <= a_end; i++);
 
   return i;
 

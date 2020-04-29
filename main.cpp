@@ -297,6 +297,7 @@ int main(int argc, char **argv)
 
 		// Calling function to import mg background data and testing the correct import
 		if( mg_import(a, fourpiG, &mg_cosmo, "mg_bk.csv") ){
+
 			COUT << " File correctly imported." << endl;
 			#ifdef MGVERBOSE
 			COUT << " Size of vector: " << mg_cosmo.a_vec.size() << endl;
@@ -320,13 +321,18 @@ int main(int argc, char **argv)
 
 			// Small test
 			#ifdef MGVERBOSE
+
 			double a_eval = 1e-1;
-			COUT << " interpolation test" <<endl;
-	    COUT << " spline eval:" << a_eval << " " << gsl_spline_eval(mg_cosmo.spline_mg_field,a_eval,mg_cosmo.acc_mg_field) << endl;
-	    COUT << " spline eval:" << a_eval << " " << gsl_spline_eval(mg_cosmo.spline_mg_field_p,a_eval,mg_cosmo.acc_mg_field_p) << endl;
-	    COUT << " spline eval:" << a_eval << " " << gsl_spline_eval(mg_cosmo.spline_H,a_eval,mg_cosmo.acc_H) << endl;
-	    COUT << " spline eval:" << a_eval << " " << gsl_spline_eval(mg_cosmo.spline_particleHorizon,a_eval,mg_cosmo.acc_particleHorizon) << endl;
+
+			COUT << " interpolation test at a: " << a_eval <<endl;
+	    COUT << " spline eval: " << gsl_spline_eval(mg_cosmo.spline_mg_field,a_eval,mg_cosmo.acc_mg_field) << endl;
+	    COUT << " spline eval: " << gsl_spline_eval(mg_cosmo.spline_mg_field_p,a_eval,mg_cosmo.acc_mg_field_p) << endl;
+	    COUT << " spline eval: " << gsl_spline_eval(mg_cosmo.spline_H,a_eval,mg_cosmo.acc_H) << endl;
+	    COUT << " spline eval: " << gsl_spline_eval(mg_cosmo.spline_particleHorizon,a_eval,mg_cosmo.acc_particleHorizon) << endl;
+
+			//This function returns the index i of the array x_array such that x_array[i] <= x < x_array[i+1]
 	    COUT << mg_cosmo.last_int << " " << mg_cosmo.particleHorizon[gsl_interp_bsearch(mg_cosmo.a,a_eval,0,mg_cosmo.last_int)] << endl;
+
 			#endif
 
 		}
@@ -343,15 +349,27 @@ int main(int argc, char **argv)
 	tau = particleHorizon(a, fourpiG, cosmo);
 
 	#ifdef MG
+
 	#ifdef MGVERBOSE
+	COUT << " mgevolution VERBOSE: Hubble parameter check at z_in: " << Hconf(a, fourpiG, cosmo) << " , while mg value " << gsl_spline_eval(mg_cosmo.spline_H,a,mg_cosmo.acc_H) << endl << endl;
 	COUT << " mgevolution VERBOSE: particle horizon check at z_in: " << tau << " , while mg value " << gsl_spline_eval(mg_cosmo.spline_particleHorizon,a,mg_cosmo.acc_particleHorizon) << endl << endl;
 	#endif
-	#endif
+
+	tau = gsl_spline_eval(mg_cosmo.spline_particleHorizon,a,mg_cosmo.acc_particleHorizon);
+
+	if (sim.Cf * dx < sim.steplimit / gsl_spline_eval(mg_cosmo.spline_H,a,mg_cosmo.acc_H))
+		dtau = sim.Cf * dx;
+	else
+		dtau = sim.steplimit / gsl_spline_eval(mg_cosmo.spline_H,a,mg_cosmo.acc_H);
+
+	#else
 
 	if (sim.Cf * dx < sim.steplimit / Hconf(a, fourpiG, cosmo))
 		dtau = sim.Cf * dx;
 	else
 		dtau = sim.steplimit / Hconf(a, fourpiG, cosmo);
+
+	#endif
 
 	dtau_old = 0.;
 
@@ -528,7 +546,11 @@ int main(int argc, char **argv)
 
 			if (dtau_old > 0.)
 			{
+				#ifdef MG
+				prepareFTsource<Real>(phi, chi, source, cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo), source, 3. * gsl_spline_eval(mg_cosmo.spline_H,a,mg_cosmo.acc_H) * dx * dx / dtau_old, fourpiG * dx * dx / a, 3. * gsl_spline_eval(mg_cosmo.spline_H,a,mg_cosmo.acc_H) * gsl_spline_eval(mg_cosmo.spline_H,a,mg_cosmo.acc_H) * dx * dx);  // prepare nonlinear source for phi update
+				#else
 				prepareFTsource<Real>(phi, chi, source, cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo), source, 3. * Hconf(a, fourpiG, cosmo) * dx * dx / dtau_old, fourpiG * dx * dx / a, 3. * Hconf(a, fourpiG, cosmo) * Hconf(a, fourpiG, cosmo) * dx * dx);  // prepare nonlinear source for phi update
+				#endif
 
 #ifdef BENCHMARK
 				ref2_time= MPI_Wtime();
@@ -539,7 +561,11 @@ int main(int argc, char **argv)
 				fft_count++;
 #endif
 
+				#ifdef MG
+				solveModifiedPoissonFT(scalarFT, scalarFT, 1. / (dx * dx), 3. * gsl_spline_eval(mg_cosmo.spline_H,a,mg_cosmo.acc_H) / dtau_old);  // phi update (k-space)
+				#else
 				solveModifiedPoissonFT(scalarFT, scalarFT, 1. / (dx * dx), 3. * Hconf(a, fourpiG, cosmo) / dtau_old);  // phi update (k-space)
+				#endif
 
 #ifdef BENCHMARK
 				ref2_time= MPI_Wtime();
@@ -589,8 +615,12 @@ int main(int argc, char **argv)
 			{
 				if (cycle == 0)
 					fprintf(outfile, "# background statistics\n# cycle   tau/boxsize    a             conformal H/H0  phi(k=0)       T00(k=0)\n");
-				fprintf(outfile, " %6d   %e   %e   %e   %e   %e\n", cycle, tau, a, Hconf(a, fourpiG, cosmo) / Hconf(1., fourpiG, cosmo), scalarFT(kFT).real(), T00hom);
-				fclose(outfile);
+					#ifdef MG
+					fprintf(outfile, " %6d   %e   %e   %e   %e   %e\n", cycle, tau, a, gsl_spline_eval(mg_cosmo.spline_H,a,mg_cosmo.acc_H) / gsl_spline_eval(mg_cosmo.spline_H,1.,mg_cosmo.acc_H), scalarFT(kFT).real(), T00hom);
+					#else
+					fprintf(outfile, " %6d   %e   %e   %e   %e   %e\n", cycle, tau, a, Hconf(a, fourpiG, cosmo) / Hconf(1., fourpiG, cosmo), scalarFT(kFT).real(), T00hom);
+					#endif
+					fclose(outfile);
 			}
 		}
 		// done recording background data
@@ -767,7 +797,11 @@ int main(int argc, char **argv)
 				COUT << "), baryon max |v| = " << maxvel[1] << " (Courant factor = " << maxvel[1] * dtau / dx;
 			}
 
+			#ifdef MG
+			COUT << "), time step / Hubble time (mg) = " << gsl_spline_eval(mg_cosmo.spline_H,a,mg_cosmo.acc_H) * dtau;
+			#else
 			COUT << "), time step / Hubble time = " << Hconf(a, fourpiG, cosmo) * dtau;
+			#endif
 
 			for (i = 0; i < cosmo.num_ncdm; i++)
 			{
@@ -925,10 +959,25 @@ int main(int argc, char **argv)
 
 		dtau_old = dtau;
 
+		#ifdef MG
+
+		#ifdef MGVERBOSE
+		COUT << " mgevolution VERBOSE: Hubble parameter check at a = " << a << " : " << Hconf(a, fourpiG, cosmo) << " , while mg value " << gsl_spline_eval(mg_cosmo.spline_H,a,mg_cosmo.acc_H) << endl;
+		#endif
+
+		if (sim.Cf * dx < sim.steplimit / gsl_spline_eval(mg_cosmo.spline_H,a,mg_cosmo.acc_H))
+			dtau = sim.Cf * dx;
+		else
+			dtau = sim.steplimit / gsl_spline_eval(mg_cosmo.spline_H,a,mg_cosmo.acc_H);
+
+		#else
+
 		if (sim.Cf * dx < sim.steplimit / Hconf(a, fourpiG, cosmo))
 			dtau = sim.Cf * dx;
 		else
 			dtau = sim.steplimit / Hconf(a, fourpiG, cosmo);
+
+		#endif
 
 		cycle++;
 
@@ -949,6 +998,7 @@ int main(int argc, char **argv)
 #endif
 
 #ifdef MG
+	// Free interpolation structures
 	gsl_spline_free(mg_cosmo.spline_mg_field);gsl_interp_accel_free(mg_cosmo.acc_mg_field);
 	gsl_spline_free(mg_cosmo.spline_mg_field_p);gsl_interp_accel_free(mg_cosmo.acc_mg_field_p);
 	gsl_spline_free(mg_cosmo.spline_H);gsl_interp_accel_free(mg_cosmo.acc_H);
