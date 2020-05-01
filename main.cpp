@@ -295,6 +295,13 @@ int main(int argc, char **argv)
 		// Defining the structure for mg computations
 		mg_cosmology mg_cosmo;
 
+		// Defining tau for evolution evaluations
+		double mg_tau;
+
+		//for(const auto & element: mg_cosmo.a_vec){
+		//	element
+		//}
+
 		// Calling function to import mg background data and testing the correct import
 		if( mg_import(a, fourpiG, &mg_cosmo, "mg_bk.csv") ){
 
@@ -306,6 +313,12 @@ int main(int argc, char **argv)
 			// Definitions for interpolation (spline method), with accelerators
 			mg_cosmo.acc_H = gsl_interp_accel_alloc();
 			mg_cosmo.spline_H = gsl_spline_alloc(gsl_interp_cspline,mg_cosmo.last_int);
+			mg_cosmo.acc_Omega_m = gsl_interp_accel_alloc();
+			mg_cosmo.spline_Omega_m = gsl_spline_alloc(gsl_interp_cspline,mg_cosmo.last_int);
+			mg_cosmo.acc_Omega_rad = gsl_interp_accel_alloc();
+			mg_cosmo.spline_Omega_rad = gsl_spline_alloc(gsl_interp_cspline,mg_cosmo.last_int);
+			mg_cosmo.acc_Omega_mg = gsl_interp_accel_alloc();
+			mg_cosmo.spline_Omega_mg = gsl_spline_alloc(gsl_interp_cspline,mg_cosmo.last_int);
 			mg_cosmo.acc_particleHorizon = gsl_interp_accel_alloc();
 	    mg_cosmo.spline_particleHorizon = gsl_spline_alloc(gsl_interp_cspline,mg_cosmo.last_int);
 			mg_cosmo.acc_mg_field = gsl_interp_accel_alloc();
@@ -313,11 +326,19 @@ int main(int argc, char **argv)
 	    mg_cosmo.acc_mg_field_p = gsl_interp_accel_alloc();
 	    mg_cosmo.spline_mg_field_p = gsl_spline_alloc(gsl_interp_cspline,mg_cosmo.last_int);
 
+			mg_cosmo.acc_a = gsl_interp_accel_alloc();
+			mg_cosmo.spline_a = gsl_spline_alloc(gsl_interp_cspline,mg_cosmo.last_int);
+
 			// Initialization of interpolation structures
 			gsl_spline_init(mg_cosmo.spline_H,mg_cosmo.a,mg_cosmo.H,mg_cosmo.last_int);
+			gsl_spline_init(mg_cosmo.spline_Omega_m,mg_cosmo.a,mg_cosmo.Omega_m,mg_cosmo.last_int);
+			gsl_spline_init(mg_cosmo.spline_Omega_rad,mg_cosmo.a,mg_cosmo.Omega_m,mg_cosmo.last_int);
+			gsl_spline_init(mg_cosmo.spline_Omega_mg,mg_cosmo.a,mg_cosmo.Omega_m,mg_cosmo.last_int);
 			gsl_spline_init(mg_cosmo.spline_particleHorizon,mg_cosmo.a,mg_cosmo.particleHorizon,mg_cosmo.last_int);
 	    gsl_spline_init(mg_cosmo.spline_mg_field,mg_cosmo.a,mg_cosmo.mg_field,mg_cosmo.last_int);
 	    gsl_spline_init(mg_cosmo.spline_mg_field_p,mg_cosmo.a,mg_cosmo.mg_field_p,mg_cosmo.last_int);
+
+			gsl_spline_init(mg_cosmo.spline_a,mg_cosmo.particleHorizon,mg_cosmo.a,mg_cosmo.last_int);
 
 			// Small test
 			#ifdef MGVERBOSE
@@ -352,6 +373,9 @@ int main(int argc, char **argv)
 
 	#ifdef MGVERBOSE
 	COUT << " mgevolution VERBOSE: Hubble parameter check at z_in: " << Hconf(a, fourpiG, cosmo) << " , while mg value " << gsl_spline_eval(mg_cosmo.spline_H,a,mg_cosmo.acc_H) << endl << endl;
+	COUT << " mgevolution VERBOSE: Hubble parameter check at z_in: " << Omega_m(a, cosmo) << " , while mg value " << gsl_spline_eval(mg_cosmo.spline_Omega_m,a,mg_cosmo.acc_Omega_m) << endl << endl;
+	COUT << " mgevolution VERBOSE: Hubble parameter check at z_in: " << Omega_rad(a, cosmo) << " , while mg value " << gsl_spline_eval(mg_cosmo.spline_Omega_rad,a,mg_cosmo.acc_Omega_rad) << endl << endl;
+	COUT << " mgevolution VERBOSE: Hubble parameter check at z_in: " << Omega_Lambda(a, cosmo) << " , while mg value " << gsl_spline_eval(mg_cosmo.spline_Omega_mg,a,mg_cosmo.acc_Omega_mg) << endl << endl;
 	COUT << " mgevolution VERBOSE: particle horizon check at z_in: " << tau << " , while mg value " << gsl_spline_eval(mg_cosmo.spline_particleHorizon,a,mg_cosmo.acc_particleHorizon) << endl << endl;
 	#endif
 
@@ -374,9 +398,17 @@ int main(int argc, char **argv)
 	dtau_old = 0.;
 
 	if (ic.generator == ICGEN_BASIC)
-		generateIC_basic(sim, ic, cosmo, fourpiG, &pcls_cdm, &pcls_b, pcls_ncdm, maxvel, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij, params, numparam); // generates ICs on the fly
+		generateIC_basic(sim, ic, cosmo,
+			#ifdef MG
+			mg_cosmo,
+			#endif
+			fourpiG, &pcls_cdm, &pcls_b, pcls_ncdm, maxvel, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij, params, numparam); // generates ICs on the fly
 	else if (ic.generator == ICGEN_READ_FROM_DISK)
-		readIC(sim, ic, cosmo, fourpiG, a, tau, dtau, dtau_old, &pcls_cdm, &pcls_b, pcls_ncdm, maxvel, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij, cycle, snapcount, pkcount, restartcount, IDbacklog);
+		readIC(sim, ic, cosmo,
+			#ifdef MG
+			mg_cosmo,
+			#endif
+			fourpiG, a, tau, dtau, dtau_old, &pcls_cdm, &pcls_b, pcls_ncdm, maxvel, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij, cycle, snapcount, pkcount, restartcount, IDbacklog);
 #ifdef ICGEN_PREVOLUTION
 	else if (ic.generator == ICGEN_PREVOLUTION)
 		generateIC_prevolution(sim, ic, cosmo, fourpiG, a, tau, dtau, dtau_old, &pcls_cdm, &pcls_b, pcls_ncdm, maxvel, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij, params, numparam);
@@ -694,7 +726,11 @@ int main(int argc, char **argv)
 
 		// lightcone output
 		if (sim.num_lightcone > 0)
-			writeLightcones(sim, cosmo, fourpiG, a, tau, dtau, dtau_old, maxvel[0], cycle, h5filename + sim.basename_lightcone, &pcls_cdm, &pcls_b, pcls_ncdm, &phi, &chi, &Bi, &Sij, &BiFT, &SijFT, &plan_Bi, &plan_Sij, done_hij, IDbacklog);
+			writeLightcones(sim, cosmo,
+				#ifdef MG
+				mg_cosmo,
+				#endif
+				fourpiG, a, tau, dtau, dtau_old, maxvel[0], cycle, h5filename + sim.basename_lightcone, &pcls_cdm, &pcls_b, pcls_ncdm, &phi, &chi, &Bi, &Sij, &BiFT, &SijFT, &plan_Bi, &plan_Sij, done_hij, IDbacklog);
 		else done_hij = 0;
 
 #ifdef BENCHMARK
@@ -707,7 +743,11 @@ int main(int argc, char **argv)
 		{
 			COUT << COLORTEXT_CYAN << " writing snapshot" << COLORTEXT_RESET << " at z = " << ((1./a) - 1.) <<  " (cycle " << cycle << "), tau/boxsize = " << tau << endl;
 
-			writeSnapshots(sim, cosmo, fourpiG, a, dtau_old, done_hij, snapcount, h5filename + sim.basename_snapshot, &pcls_cdm, &pcls_b, pcls_ncdm, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij
+			writeSnapshots(sim, cosmo,
+				#ifdef MG
+				mg_cosmo,
+				#endif
+				fourpiG, a, dtau_old, done_hij, snapcount, h5filename + sim.basename_snapshot, &pcls_cdm, &pcls_b, pcls_ncdm, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij
 #ifdef CHECK_B
 				, &Bi_check, &BiFT_check, &plan_Bi_check
 #endif
@@ -747,8 +787,14 @@ int main(int argc, char **argv)
 
 #ifdef EXACT_OUTPUT_REDSHIFTS
 		tmp = a;
+
+		#ifdef MG
+		mg_tau = gsl_spline_eval(mg_cosmo.spline_particleHorizon, tmp, mg_cosmo.acc_particleHorizon);
+		tmp = gsl_spline_eval(mg_cosmo.spline_a , mg_tau + 0.5 * dtau + 0.5 * dtau, mg_cosmo.acc_a);
+		#else
 		rungekutta4bg(tmp, fourpiG, cosmo, 0.5 * dtau);
 		rungekutta4bg(tmp, fourpiG, cosmo, 0.5 * dtau);
+		#endif
 
 		if (pkcount < sim.num_pk && 1. / tmp < sim.z_pk[pkcount] + 1.)
 		{
@@ -843,7 +889,13 @@ int main(int argc, char **argv)
 				ref2_time = MPI_Wtime();
 #endif
 
+				#ifdef MG
+				mg_tau = gsl_spline_eval(mg_cosmo.spline_particleHorizon, tmp, mg_cosmo.acc_particleHorizon);
+				tmp = gsl_spline_eval(mg_cosmo.spline_a , mg_tau + 0.5 * dtau / numsteps_ncdm[i], mg_cosmo.acc_a);
+				#else
 				rungekutta4bg(tmp, fourpiG, cosmo, 0.5 * dtau / numsteps_ncdm[i]);
+				#endif
+
 				f_params[0] = tmp;
 				f_params[1] = tmp * tmp * sim.numpts;
 
@@ -856,7 +908,12 @@ int main(int argc, char **argv)
 				moveParts_time += MPI_Wtime() - ref2_time;
 				ref2_time = MPI_Wtime();
 #endif
+				#ifdef MG
+				mg_tau = gsl_spline_eval(mg_cosmo.spline_particleHorizon, tmp, mg_cosmo.acc_particleHorizon);
+				tmp = gsl_spline_eval(mg_cosmo.spline_a , mg_tau + 0.5 * dtau / numsteps_ncdm[i], mg_cosmo.acc_a);
+				#else
 				rungekutta4bg(tmp, fourpiG, cosmo, 0.5 * dtau / numsteps_ncdm[i]);
+				#endif
 			}
 		}
 
@@ -882,7 +939,12 @@ int main(int argc, char **argv)
 		ref2_time = MPI_Wtime();
 #endif
 
+		#ifdef MG
+		mg_tau = gsl_spline_eval(mg_cosmo.spline_particleHorizon, a, mg_cosmo.acc_particleHorizon);
+		a = gsl_spline_eval(mg_cosmo.spline_a ,mg_tau + 0.5 * dtau, mg_cosmo.acc_a);
+		#else
 		rungekutta4bg(a, fourpiG, cosmo, 0.5 * dtau);  // evolve background by half a time step
+		#endif
 
 		f_params[0] = a;
 		f_params[1] = a * a * sim.numpts;
@@ -904,7 +966,12 @@ int main(int argc, char **argv)
 		moveParts_time += MPI_Wtime() - ref2_time;
 #endif
 
+		#ifdef MG
+		mg_tau = gsl_spline_eval(mg_cosmo.spline_particleHorizon, a, mg_cosmo.acc_particleHorizon);
+		a = gsl_spline_eval(mg_cosmo.spline_a ,mg_tau + 0.5 * dtau, mg_cosmo.acc_a);
+		#else
 		rungekutta4bg(a, fourpiG, cosmo, 0.5 * dtau);  // evolve background by half a time step
+		#endif
 
 		parallel.max<double>(maxvel, numspecies);
 
@@ -999,10 +1066,15 @@ int main(int argc, char **argv)
 
 #ifdef MG
 	// Free interpolation structures
+	gsl_spline_free(mg_cosmo.spline_H);gsl_interp_accel_free(mg_cosmo.acc_H);
+	gsl_spline_free(mg_cosmo.spline_Omega_m);gsl_interp_accel_free(mg_cosmo.acc_Omega_m);
+	gsl_spline_free(mg_cosmo.spline_Omega_rad);gsl_interp_accel_free(mg_cosmo.acc_Omega_rad);
+	gsl_spline_free(mg_cosmo.spline_Omega_mg);gsl_interp_accel_free(mg_cosmo.acc_Omega_mg);
 	gsl_spline_free(mg_cosmo.spline_mg_field);gsl_interp_accel_free(mg_cosmo.acc_mg_field);
 	gsl_spline_free(mg_cosmo.spline_mg_field_p);gsl_interp_accel_free(mg_cosmo.acc_mg_field_p);
-	gsl_spline_free(mg_cosmo.spline_H);gsl_interp_accel_free(mg_cosmo.acc_H);
 	gsl_spline_free(mg_cosmo.spline_particleHorizon);gsl_interp_accel_free(mg_cosmo.acc_particleHorizon);
+
+	gsl_spline_free(mg_cosmo.spline_a);gsl_interp_accel_free(mg_cosmo.acc_a);
 	#ifdef MGVERBOSE
 		COUT << endl << "mg interpolation structures correctly deallocated" << endl;
 	#endif

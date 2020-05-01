@@ -139,7 +139,6 @@ double Hconf(const double a, const double fourpiG, const cosmology cosmo)
 	return sqrt((2. * fourpiG / 3.) * (((cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo)) / a) + (cosmo.Omega_Lambda * a * a) + (cosmo.Omega_rad / a / a) + (cosmo.Omega_fld * exp(3. * cosmo.wa_fld * (a - 1.)) / pow(a, 1. + 3. * (cosmo.w0_fld + cosmo.wa_fld)))));
 }
 
-
 double Omega_m(const double a, const cosmology cosmo) { return cosmo.Omega_m / (cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo) + cosmo.Omega_Lambda * a * a * a + cosmo.Omega_rad / a + cosmo.Omega_fld * exp(3. * cosmo.wa_fld * (a - 1.)) / pow(a, 3. * (cosmo.w0_fld + cosmo.wa_fld))); }
 
 double Omega_rad(const double a, const cosmology cosmo) { return (cosmo.Omega_rad + (bg_ncdm(a, cosmo) + cosmo.Omega_cdm + cosmo.Omega_b - cosmo.Omega_m) * a) / ((cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo)) * a + cosmo.Omega_Lambda * a * a * a * a + cosmo.Omega_rad + cosmo.Omega_fld * exp(3. * cosmo.wa_fld * (a - 1.)) / pow(a, 3. * (cosmo.w0_fld + cosmo.wa_fld) - 1.)); }

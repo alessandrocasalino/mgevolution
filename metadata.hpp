@@ -1,7 +1,7 @@
 //////////////////////////
 // metadata.hpp
 //////////////////////////
-// 
+//
 // Constants and metadata structures
 //
 // Author: Julian Adamek (Université de Genève & Observatoire de Paris & Queen Mary University of London)
@@ -284,5 +284,61 @@ struct cosmology
 	double deg_ncdm[MAX_PCL_SPECIES-2];
 	int num_ncdm;
 };
+
+
+#ifdef MG
+// Definition of the MG cosmology structure
+
+#include <gsl/gsl_errno.h>
+#include <gsl/gsl_spline.h>
+
+struct mg_cosmology
+{
+
+  // Vector of background values to be filled with mg_import function
+  std::vector<double> a_vec;
+  std::vector<double> H_vec;
+	std::vector<double> Omega_m_vec;
+	std::vector<double> Omega_rad_vec;
+	std::vector<double> Omega_mg_vec;
+  std::vector<double> mg_field_vec;
+  std::vector<double> mg_field_p_vec;
+  std::vector<double> particleHorizon_vec;
+
+  // Pointers to associated double * arrays to the above vectors (necessary as inputs of GSL interpolation)
+  double * a;
+  double * H;
+	double * Omega_m;
+	double * Omega_rad;
+	double * Omega_mg;
+  double * mg_field;
+  double * mg_field_p;
+  double * particleHorizon;
+
+  // Value of the size of the vectors
+  int last_int;
+
+  // Interpolation structures (allocated in main)
+  gsl_interp_accel * acc_H;
+  gsl_spline * spline_H;
+	gsl_interp_accel * acc_Omega_m;
+  gsl_spline * spline_Omega_m;
+	gsl_interp_accel * acc_Omega_rad;
+  gsl_spline * spline_Omega_rad;
+	gsl_interp_accel * acc_Omega_mg;
+  gsl_spline * spline_Omega_mg;
+  gsl_interp_accel * acc_mg_field;
+  gsl_spline * spline_mg_field;
+  gsl_interp_accel * acc_mg_field_p;
+  gsl_spline * spline_mg_field_p;
+  gsl_interp_accel * acc_particleHorizon;
+  gsl_spline * spline_particleHorizon;
+
+	// "Inverse" interpolation structure to find the scale factor as a function of the particle horizon
+	gsl_interp_accel * acc_a;
+  gsl_spline * spline_a;
+
+};
+#endif
 
 #endif

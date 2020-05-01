@@ -24,7 +24,7 @@ DGEVOLUTION  += -DEXACT_OUTPUT_REDSHIFTS
 #DGEVOLUTION  += -DVELOCITY      # enables velocity field utilities
 #DGEVOLUTION  += -DCOLORTERMINAL
 #DGEVOLUTION  += -DCHECK_B
-DGEVOLUTION  += -DHAVE_CLASS    # requires LIB -lclass
+#DGEVOLUTION  += -DHAVE_CLASS    # requires LIB -lclass
 #DGEVOLUTION  += -DHAVE_HEALPIX  # requires LIB -lchealpix
 
 # MG module
