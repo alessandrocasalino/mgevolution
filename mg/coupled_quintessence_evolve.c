@@ -40,14 +40,16 @@ double T_CONF = 1.;
 
 // Number of points used in the computation
 int points = (int) 1e6;
+// Max tau
+double max_tau = 20.;
 
 // Raise this value to make the csv file smaller, but decreasing resolution
 // The value inserted is the ratio between the number of values written in a full resolution file / decreased resolution file
 int csv_resolution = 10;
 
-double delta_bisection = 1e-2;
+double delta_bisection = 1e-3;
 double mg_field_init_min = 1e-20;
-double mg_field_init_max = 2e2; //1e16 max for LCDM (model 1)
+double mg_field_init_max = 2e6;
 
 
 // QUINTESSENCE PARAMETERS
@@ -63,39 +65,40 @@ int TEST_MODE = 1;
 // For a list of the models see above
 
 double mg_pot_const = 1.;
+double mg_pot_exp = 0.5;
 
 double mg_pot(const double mg_field_bk) {
 
-  return mg_pot_const * mg_field_bk * mg_field_bk / 2.;
+  return mg_pot_const / pow(mg_field_bk/sqrt(2.*fourpiG), mg_pot_exp);
 
 }
 
 double mg_pot_p(const double mg_field_bk) {
 
-  return mg_pot_const * mg_field_bk;
+  return - mg_pot_exp * mg_pot_const / pow(mg_field_bk/sqrt(2.*fourpiG), mg_pot_exp + 1.) / sqrt(2.*fourpiG);
 
 }
 
 // Definition of the COUPLING FUNCION
 // For a list of the models see above
 
-double mg_coupl_const = 1e-4;
+double mg_coupl_const = 0.01;
 
 double mg_coupl(const double mg_field_bk) {
 
-  return mg_coupl_const * mg_field_bk * mg_field_bk / 2.;
+  return mg_coupl_const * mg_field_bk * mg_field_bk / (2.*fourpiG);
 
 }
 
 double mg_coupl_p(const double mg_field_bk) {
 
-  return mg_coupl_const * mg_field_bk;
+  return 2. * mg_coupl_const * mg_field_bk / (2.*fourpiG);
 
 }
 
 double mg_coupl_pp(const double mg_field_bk) {
 
-  return mg_coupl_const;
+  return 2. * mg_coupl_const / (2.*fourpiG);
 
 }
 
@@ -224,7 +227,7 @@ int scan_for_a0 (double * a, double ae) {
 
   int i=0;
 
-  for(i=0; a[i] <= ae; i++);
+  for(i=0; a[i] <= ae && i < points; i++);
 
   return i;
 
@@ -251,7 +254,6 @@ void logscale10 (double * v, double A, double B, int points){
 void mg_rungekutta4bg(double * f, const double dtau)
 {
 
-  double k_F[4], k_A[4], k_rhof[4], k_rhor[4], k_rhob[4];
   double a = f[1];
   double a_p = f[2];
   double mg_field_bk = f[3];
@@ -297,7 +299,7 @@ double rk4(double * t, double * a, double * a_p, double * mg_field_bk, double * 
 
     // Call the function for a logarithmic scale of time
     // We don't start from t = 0 to avoid problems with quintessence potentials
-    logscale10(t,1e-9,20.,points);
+    logscale10(t,1e-9,max_tau,points);
 
     while( i < points - 1 ){
 
