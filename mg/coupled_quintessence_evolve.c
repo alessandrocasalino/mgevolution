@@ -41,15 +41,15 @@ double T_CONF = 1.;
 // Number of points used in the computation
 int points = (int) 1e6;
 // Max tau
-double max_tau = 20.;
+double max_tau = 200.;
 
 // Raise this value to make the csv file smaller, but decreasing resolution
 // The value inserted is the ratio between the number of values written in a full resolution file / decreased resolution file
 int csv_resolution = 10;
 
 double delta_bisection = 1e-3;
-double mg_field_init_min = 1e-20;
-double mg_field_init_max = 2e6;
+double mg_field_init_min = 1e-4;
+double mg_field_init_max = 1e4;
 
 
 // QUINTESSENCE PARAMETERS
@@ -64,41 +64,41 @@ int TEST_MODE = 1;
 // Definition of the POTENTIAL
 // For a list of the models see above
 
-double mg_pot_const = 1.;
+double mg_pot_const = 10.;
 double mg_pot_exp = 0.5;
 
 double mg_pot(const double mg_field_bk) {
 
-  return mg_pot_const / pow(mg_field_bk/sqrt(2.*fourpiG), mg_pot_exp);
+  return mg_pot_const / pow(mg_field_bk * sqrt(2.*fourpiG), mg_pot_exp);
 
 }
 
 double mg_pot_p(const double mg_field_bk) {
 
-  return - mg_pot_exp * mg_pot_const / pow(mg_field_bk/sqrt(2.*fourpiG), mg_pot_exp + 1.) / sqrt(2.*fourpiG);
+  return - mg_pot_exp * mg_pot_const / pow(mg_field_bk * sqrt(2.*fourpiG), mg_pot_exp + 1.) * sqrt(2.*fourpiG);
 
 }
 
 // Definition of the COUPLING FUNCION
 // For a list of the models see above
 
-double mg_coupl_const = 0.01;
+double mg_coupl_const = 1e-5;
 
 double mg_coupl(const double mg_field_bk) {
 
-  return mg_coupl_const * mg_field_bk * mg_field_bk / (2.*fourpiG);
+  return mg_coupl_const * mg_field_bk * mg_field_bk * (2.*fourpiG);
 
 }
 
 double mg_coupl_p(const double mg_field_bk) {
 
-  return 2. * mg_coupl_const * mg_field_bk / (2.*fourpiG);
+  return 2. * mg_coupl_const * mg_field_bk * (2.*fourpiG);
 
 }
 
 double mg_coupl_pp(const double mg_field_bk) {
 
-  return 2. * mg_coupl_const / (2.*fourpiG);
+  return 2. * mg_coupl_const * (2.*fourpiG);
 
 }
 
@@ -148,6 +148,18 @@ double particleHorizon(const int i, double * a, double * mg_field_bk, double * m
   return h*(fa+fb)/2.;
 }
 
+
+
+int scan_for_a0 (double * a, double ae) {
+
+  int i=0;
+
+  for(i=0; a[i] <= ae && i < points; i++);
+
+  return i;
+
+}
+
 // Function used to print results stored in vectors as a csv file
 void csv(double * t, double * a, double * a_p, double * mg_field_bk, double * mg_field_p_bk, double * particleHorizonVec, char * filename) {
 
@@ -176,22 +188,29 @@ void csv(double * t, double * a, double * a_p, double * mg_field_bk, double * mg
 
     double H_test, H_cosmo = 0.;
 
-    while( a[i] <= a_end){
+    int last_int = scan_for_a0(a,1.);
+
+    while( a[i] <= a_end ){
 
       double H = Hconf(a[i],mg_field_bk[i],mg_field_p_bk[i]); // this is the Hubble constant with conformal time
-      double H_cosmo = H / a[i];
       double H_prime = a_pp_rk4(a[i], a_p[i], mg_field_bk[i], mg_field_p_bk[i]) / a[i] - H * H; // this is Hubble prime with conformal time
+
+      double den_fact = (1. + mg_coupl(mg_field_bk[i]) + 3./2./fourpiG * mg_field_p_bk[i] * mg_coupl_p(mg_field_bk[i])/H);
+      double Omega_df  = (2. * fourpiG / 3.) * ( (mg_field_p_bk[i] * mg_field_p_bk[i] / 2.) + (a[i] * a[i] * mg_pot(mg_field_bk[i]))) /H /H / den_fact;
+      double Omega_rad = 2. * fourpiG / 3. * Omega_rad_0 /a[i] /a[i] /H /H / den_fact;
+      double Omega_b = 2. * fourpiG / 3. * Omega_b_0 /a[i] /H /H / den_fact;
+      double Omega_cdm = 2. * fourpiG / 3. * Omega_cdm_0 /a[i] /H /H / den_fact;
+
+      //double P_df = -a[i] * a[i] * mg_pot(mg_field_bk[i])+mg_field_p_bk[i]*mg_field_p_bk[i]/2.-mg_coupl_p(mg_field_bk[i])*(H * mg_field_p_bk[i] + a[i] * a[i] * mg_pot_p(mg_field_bk[i]))/2./fourpiG + mg_field_p_bk[i] * mg_field_p_bk[i] * mg_coupl_pp(mg_field_bk[i])/2./fourpiG;
+      double P_df   = - mg_pot(mg_field_bk[i]) + mg_field_p_bk[i] * mg_field_p_bk[i]/2./a[i]/a[i] * (1. + mg_coupl_pp(mg_field_bk[i])/fourpiG) - mg_coupl_p(mg_field_bk[i]) * mg_pot_p(mg_field_bk[i])/2./fourpiG;
+      double rho_df = mg_pot(mg_field_bk[i]) + mg_field_p_bk[i] * mg_field_p_bk[i]/2./a[i]/a[i];
+
+      double omega_df = P_df/rho_df;
+
       if(T_CONF==0) H_prime = ( H_prime - H * H )/a[i]/a[i]; // this is Hubble prime with cosmological time
-      if(T_CONF==0) H = H_cosmo; // this it the Hubble constant with cosmological time
+      if(T_CONF==0) H = H / a[i]; // this it the Hubble constant with cosmological time
 
-      double Omega_df  = (2. * fourpiG / 3.) / (1. + mg_coupl(mg_field_bk[i])) * ( (mg_field_p_bk[i] * mg_field_p_bk[i] / 2.) + (a[i] * a[i] * mg_pot(mg_field_bk[i])) - 3./2./fourpiG * H * mg_field_p_bk[i] * mg_coupl_p(mg_field_bk[i])) /H /H;
-      double Omega_rad = 2. * fourpiG / 3. * Omega_rad_0 /a[i] /a[i] /a[i] /a[i] /H_cosmo  / H_cosmo / (1. + mg_coupl(mg_field_bk[i]));
-      double Omega_b = 2. * fourpiG / 3. * Omega_b_0 /a[i] /a[i] /a[i] /H_cosmo  / H_cosmo / (1. + mg_coupl(mg_field_bk[i]));
-      double Omega_cdm = 2. * fourpiG / 3. * Omega_cdm_0 /a[i] /a[i] /a[i] /H_cosmo  / H_cosmo / (1. + mg_coupl(mg_field_bk[i]));
-
-      double omega_df = (-a[i] * a[i] * mg_pot(mg_field_bk[i])+mg_field_p_bk[i]*mg_field_p_bk[i]/2.-mg_coupl_p(mg_field_p_bk[i])*(H * mg_field_p_bk[i] + a[i] * a[i] * mg_pot(mg_field_bk[i]))/2./fourpiG + mg_field_p_bk[i] * mg_field_p_bk[i] * mg_coupl_pp(mg_field_bk[i])/2./fourpiG)/(a[i] * a[i]* mg_pot(mg_field_bk[i])+mg_field_p_bk[i]*mg_field_p_bk[i]/2.-3./2./fourpiG * H * mg_field_p_bk[i] * mg_coupl(mg_field_bk[i]));
-
-      fprintf(fp, "%e, %e, %e, %e, %e, %e, %e, %e", t[i], a[i], H / sqrt(2. * fourpiG / 3.), H_prime / sqrt(2. * fourpiG / 3.) / sqrt(2. * fourpiG / 3.), Omega_df, Omega_rad, Omega_b, Omega_cdm );
+      fprintf(fp, "%e, %e, %e, %e, %e, %e, %e, %e", t[i], a[i], H / sqrt(2. * fourpiG / 3. / (1. + mg_coupl(mg_field_bk[last_int]))), H_prime * (1. + mg_coupl(mg_field_bk[last_int]))/ sqrt(2. * fourpiG / 3.) / sqrt(2. * fourpiG / 3.), Omega_df, Omega_rad, Omega_b, Omega_cdm );
       fprintf(fp, ", %e", omega_df);
 
       fprintf(fp, ", %e", particleHorizonVec[i]);
@@ -204,7 +223,7 @@ void csv(double * t, double * a, double * a_p, double * mg_field_bk, double * mg
         H_test = a_p[i]/a[i];
         if(T_CONF==0) H_test = H_test / a[i];
 
-        fprintf(fp, ", %e", H_test / sqrt(2. * fourpiG / 3.));
+        fprintf(fp, ", %e", H_test / sqrt(2. * fourpiG / 3. / (1. + mg_coupl(mg_field_bk[last_int]))) );
 
       }
 
@@ -220,16 +239,6 @@ void csv(double * t, double * a, double * a_p, double * mg_field_bk, double * mg
     }
 
     fclose(fp);
-
-}
-
-int scan_for_a0 (double * a, double ae) {
-
-  int i=0;
-
-  for(i=0; a[i] <= ae && i < points; i++);
-
-  return i;
 
 }
 
@@ -322,8 +331,11 @@ double rk4(double * t, double * a, double * a_p, double * mg_field_bk, double * 
     int j = scan_for_a0(a,1.);
 
     double H        = Hconf(a[j], mg_field_bk[j], mg_field_p_bk[j]);
-    double Omega_f  = (2. * fourpiG / 3.) / (1. + mg_coupl(mg_field_bk[j])) * ( (mg_field_p_bk[j] * mg_field_p_bk[j] / 2.) + (a[j] * a[j] * mg_pot(mg_field_bk[j])) - 3./2./fourpiG * H * mg_field_p_bk[j] * mg_coupl_p(mg_field_bk[j])) /H /H;
-    return Omega_f  - Omega_f_0;
+
+    double den_fact = (1. + mg_coupl(mg_field_bk[j]) + 3./2./fourpiG * mg_field_p_bk[j] * mg_coupl_p(mg_field_bk[j])/H);
+    double Omega_df  = (2. * fourpiG / 3.) * ( (mg_field_p_bk[j] * mg_field_p_bk[j] / 2.) + (a[j] * a[j] * mg_pot(mg_field_bk[j]))) /H /H / den_fact;
+    //double Omega_f  = (2. * fourpiG / 3.) / (1. + mg_coupl(mg_field_bk[j])) * ( (mg_field_p_bk[j] * mg_field_p_bk[j] / 2.) + (a[j] * a[j] * mg_pot(mg_field_bk[j])) - 3./2./fourpiG * H * mg_field_p_bk[j] * mg_coupl_p(mg_field_bk[j])) /H /H;
+    return Omega_df  - Omega_f_0;
 
 }
 
@@ -358,7 +370,6 @@ double bisection (double min, double max, double * t, double * a, double * a_p, 
 
   if(TEST_MODE==1) printf("\n");
   printf("\t-> Result of bisection method is mg_field_bk: %e (internal units).\n", result);
-  //if(TEST_MODE==1) printf("\t--> Confront with LCDM value: %e (internal units).\n", (2. * fourpiG / 3.) * ( Omega_Lambda_0 + 6. * OmegaCDM_0 )/ pow(a_init,3.));
 
   return result;
 
@@ -405,8 +416,10 @@ int main() {
     int last_int = scan_for_a0(a,a_end);
     int last_int_print = scan_for_a0(a,1.);
 
+    if(last_int >= points-1) printf("\n\n WARNING: the a = a_end value seems not to be reached in the result vectors! \n\n");
+
     printf("\n RESULTS:\n");
-    printf("\t-> H0: %f \n", a_p[last_int_print]/a[last_int_print]/sqrt(2. * fourpiG / 3.));
+    printf("\t-> H0: %f \n", a_p[last_int_print]/a[last_int_print]/sqrt(2. * fourpiG / 3. / (1. + mg_coupl(mg_field_bk[last_int_print]))));
     printf("\t-> number of points %d \n", last_int);
     //printf("\t-> Age of the Universe: %f Gyr\n", t[last_int] /_H0_/(60.*60.*24.*365.*1e9)*_MPc_over_m_/1000.);
 
