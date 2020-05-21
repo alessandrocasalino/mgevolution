@@ -21,7 +21,7 @@ double a_end = 1.1;
 
 // Values of fractional density for the cosmological matter today
 double Omega_rad_0 = 8e-5;
-double Omega_b_0 = 0.0486;
+double Omega_b_0 = 0.0486;//0.0486;
 double Omega_Lambda_0 = 0.;//0.6911;
 double Omega_cdm_0 = 0.2589;
 
@@ -41,7 +41,7 @@ double T_CONF = 1.;
 // Number of points used in the computation
 int points = (int) 1e6;
 // Max particle horizon value
-double max_tau = 400.;
+double max_tau = 40.;
 // Min particle horizon value
 double min_tau = 1e-9;
 
@@ -49,13 +49,21 @@ double min_tau = 1e-9;
 // The value inserted is the ratio between the number of values written in a full resolution file / decreased resolution file
 int csv_resolution = 10;
 
+// BISECTION PARAMTERS
+// Bisection precision
 double delta_bisection = 1e-3;
-double mg_field_init_min = 1e-4;
-double mg_field_init_max = 1e1;
 
+// Bisection target
+//  1: mg_field
+//  2: mg_field_p
+//  3: potential_constant
+int bisection_type = 3;
 
-// QUINTESSENCE PARAMETERS
-// Initial value of the quintessence velocity (phi derivated with respect to tau)
+double bisection_min = 0.;
+double bisection_max = 20.;
+
+// Initial conditions (considered accordingly to the bisection_type choice)
+double mg_field_bk_0 = 1e-2;
 double mg_field_p_bk_0 = 0.;
 
 // TEST MODE
@@ -65,26 +73,26 @@ int TEST_MODE = 1;
 
 // Definition of the POTENTIAL
 // For a list of the models see above
-
 double mg_pot_const = 1.;
-double mg_pot_exp = 0.1;
+double mg_pot_exp = 0.5;
+
 
 double mg_pot(const double mg_field_bk) {
 
-  return mg_pot_const / pow(mg_field_bk * sqrt(2.*fourpiG), mg_pot_exp);
+  return mg_pot_const * pow(mg_field_bk * sqrt(2.*fourpiG), mg_pot_exp);
 
 }
 
 double mg_pot_p(const double mg_field_bk) {
 
-  return - mg_pot_exp * sqrt(2.*fourpiG) * mg_pot_const / pow(mg_field_bk * sqrt(2.*fourpiG), mg_pot_exp + 1.);
+  return mg_pot_exp * sqrt(2.*fourpiG) * mg_pot_const * pow(mg_field_bk * sqrt(2.*fourpiG), mg_pot_exp - 1.);
 
 }
 
 // Definition of the COUPLING FUNCION
 // For a list of the models see above
+double mg_coupl_const = 0.2;
 
-double mg_coupl_const = -0.2;
 
 double mg_coupl(const double mg_field_bk) {
 
@@ -188,27 +196,36 @@ void csv(double * t, double * a, double * a_p, double * mg_field_bk, double * mg
 
     i = 0;
 
-    double H_test, H_cosmo = 0.;
-
     int i_a0 = scan_for_a0(a,1.);
     double H0 = Hconf(a[i_a0],mg_field_bk[i_a0],mg_field_p_bk[i_a0]);
+
+    int w1=0, w2=0;
 
     while( a[i] <= a_end ){
 
       double H = Hconf(a[i],mg_field_bk[i],mg_field_p_bk[i]); // this is the Hubble constant with conformal time
       double H_prime = a_pp_rk4(a[i], a_p[i], mg_field_bk[i], mg_field_p_bk[i]) / a[i] - H * H; // this is Hubble prime with conformal time
 
-      double den_fact = 1. + mg_coupl(mg_field_bk[i]) + mg_field_p_bk[i] * mg_coupl_p(mg_field_bk[i])/H;
-      double Omega_df  = 2. * fourpiG / 3. * ( (mg_field_p_bk[i] * mg_field_p_bk[i] / 2.) + (a[i] * a[i] * mg_pot(mg_field_bk[i]))) /H /H / den_fact;
+      double den_fact = 1. + mg_coupl(mg_field_bk[i]);// + mg_field_p_bk[i] * mg_coupl_p(mg_field_bk[i])/H;
+      //double Omega_df  = 2. * fourpiG / 3. * ( (mg_field_p_bk[i] * mg_field_p_bk[i] / 2.) + (a[i] * a[i] * mg_pot(mg_field_bk[i]))) /H /H / den_fact;
+      double Omega_df  = 2. * fourpiG / 3. * ( (mg_field_p_bk[i] * mg_field_p_bk[i] / 2.) + (a[i] * a[i] * mg_pot(mg_field_bk[i])) - 3./2./fourpiG * H * mg_field_p_bk[i] * mg_coupl_p(mg_field_bk[i]) ) /H /H / den_fact;
       double Omega_rad = 2. * fourpiG / 3. * Omega_rad_0 /a[i] /a[i] /H /H / den_fact;
       double Omega_b = 2. * fourpiG / 3. * Omega_b_0 /a[i] /H /H / den_fact;
       double Omega_cdm = 2. * fourpiG / 3. * Omega_cdm_0 /a[i] /H /H / den_fact;
 
-      //double P_df = -a[i] * a[i] * mg_pot(mg_field_bk[i])+mg_field_p_bk[i]*mg_field_p_bk[i]/2.-mg_coupl_p(mg_field_bk[i])*(H * mg_field_p_bk[i] + a[i] * a[i] * mg_pot_p(mg_field_bk[i]))/2./fourpiG + mg_field_p_bk[i] * mg_field_p_bk[i] * mg_coupl_pp(mg_field_bk[i])/2./fourpiG;
-      double P_df   = - mg_pot(mg_field_bk[i]) + mg_field_p_bk[i] * mg_field_p_bk[i]/2./a[i]/a[i] * (1. + mg_coupl_pp(mg_field_bk[i])/fourpiG) - mg_coupl_p(mg_field_bk[i]) * mg_pot_p(mg_field_bk[i])/2./fourpiG;
-      double rho_df = mg_pot(mg_field_bk[i]) + mg_field_p_bk[i] * mg_field_p_bk[i]/2./a[i]/a[i];
+      //double P_df   = - mg_pot(mg_field_bk[i]) + mg_field_p_bk[i] * mg_field_p_bk[i]/2./a[i]/a[i] * (1. + mg_coupl_pp(mg_field_bk[i])/fourpiG) - mg_coupl_p(mg_field_bk[i]) * mg_pot_p(mg_field_bk[i])/2./fourpiG;
+      //double P_df   = - mg_pot(mg_field_bk[i]) + mg_field_p_bk[i] * mg_field_p_bk[i]/2./a[i]/a[i] * (1. + mg_coupl_pp(mg_field_bk[i])/fourpiG) - mg_coupl_p(mg_field_bk[i]) * mg_pot_p(mg_field_bk[i])/2./fourpiG - (2.*mg_field_p_bk[i]/H-3.*mg_coupl_p(mg_field_bk[i])/2./fourpiG)*(H_prime+H*H)*mg_coupl_p(mg_field_bk[i])/a[i]/a[i]/2./fourpiG;
+      double P_df   = - mg_pot(mg_field_bk[i]) + mg_field_p_bk[i] * mg_field_p_bk[i]/2./a[i]/a[i] * (1. + mg_coupl_pp(mg_field_bk[i])/fourpiG) - mg_coupl_p(mg_field_bk[i]) * mg_pot_p(mg_field_bk[i])/2./fourpiG - H * mg_field_p_bk[i]*mg_coupl_p(mg_field_bk[i])/2./fourpiG/a[i]/a[i] + 3. * (H*H + H_prime)*mg_coupl_p(mg_field_bk[i])*mg_coupl_p(mg_field_bk[i])/a[i]/a[i]/2./2./fourpiG/fourpiG;
+      double rho_df = mg_pot(mg_field_bk[i]) + mg_field_p_bk[i] * mg_field_p_bk[i]/2./a[i]/a[i] - 3./2./fourpiG * H * mg_field_p_bk[i] * mg_coupl_p(mg_field_bk[i])/a[i]/a[i];
 
-      if(Omega_df+Omega_rad+Omega_b+Omega_cdm > 1.01 || Omega_df+Omega_rad+Omega_b+Omega_cdm < 0.99) printf("WARNING: the fractional density sum is %e at a = %e\n", Omega_df+Omega_rad+Omega_b+Omega_cdm,a[i]);
+      if(rho_df<0 && w1==0 && i>0){
+        printf("WARNING: the energy density is negative at a = %e\n", a[i]);
+        w1++;
+      }
+      if( (Omega_df+Omega_rad+Omega_b+Omega_cdm > 1.01 || Omega_df+Omega_rad+Omega_b+Omega_cdm < 0.99) && w2==0){
+        printf("WARNING: the fractional density sum is %e at a = %e\n", Omega_df+Omega_rad+Omega_b+Omega_cdm,a[i]);
+        w2++;
+      }
 
       double omega_df = P_df/rho_df;
 
@@ -225,10 +242,12 @@ void csv(double * t, double * a, double * a_p, double * mg_field_bk, double * mg
 
       if(TEST_MODE==1){
 
+        double H_test;
+
         H_test = a_p[i]/a[i];
         if(T_CONF==0) H_test = H_test / a[i];
 
-        fprintf(fp, ", %e", H_test / sqrt(2. * fourpiG / 3. / (1. + mg_coupl(mg_field_bk[i_a0]) + mg_field_p_bk[i_a0] * mg_coupl_p(mg_field_bk[i_a0])/(a_p[i_a0]/a[i_a0])) ));
+        fprintf(fp, ", %e", H_test / sqrt(2. * fourpiG / 3. / (1. + mg_coupl(mg_field_bk[i_a0])) ));
 
       }
 
@@ -335,46 +354,126 @@ double rk4(double * t, double * a, double * a_p, double * mg_field_bk, double * 
 
     int j = scan_for_a0(a,1.);
 
-    double H        = Hconf(a[j], mg_field_bk[j], mg_field_p_bk[j]);
+    double H         = Hconf(a[j], mg_field_bk[j], mg_field_p_bk[j]);
 
-    double den_fact = 1. + mg_coupl(mg_field_bk[j]) + mg_field_p_bk[j] * mg_coupl_p(mg_field_bk[j])/H;
-    double Omega_df  = (2. * fourpiG / 3.) * ( (mg_field_p_bk[j] * mg_field_p_bk[j] / 2.) + (a[j] * a[j] * mg_pot(mg_field_bk[j]))) /H /H / den_fact;
-    //double Omega_f  = (2. * fourpiG / 3.) / (1. + mg_coupl(mg_field_bk[j])) * ( (mg_field_p_bk[j] * mg_field_p_bk[j] / 2.) + (a[j] * a[j] * mg_pot(mg_field_bk[j])) - 3./2./fourpiG * H * mg_field_p_bk[j] * mg_coupl_p(mg_field_bk[j])) /H /H;
+    double den_fact  = 1. + mg_coupl(mg_field_bk[j]);
+    double Omega_df  = 2. * fourpiG / 3. * ( (mg_field_p_bk[j] * mg_field_p_bk[j] / 2.) + (a[j] * a[j] * mg_pot(mg_field_bk[j])) - 3./2./fourpiG * H * mg_field_p_bk[j] * mg_coupl_p(mg_field_bk[j]) ) /H /H / den_fact;
     return Omega_df  - Omega_f_0;
 
 }
 
 
-double bisection (double min, double max, double * t, double * a, double * a_p, double * mg_field_bk, double * mg_field_p_bk, const double Omega_f_0) {
+double bisection (double min, double max, double * t, double * a, double * a_p, double * mg_field_bk, double * mg_field_p_bk, const double Omega_f_0, int type) {
 
-  double C = (min+max) / 2.;
+  double result = 0.;
 
-  while(fabs((max-min)/min)>delta_bisection){
+  double C = (max+min)/2.;
 
-    a_p[0] = a_init * Hconf(a[0], mg_field_init_min, mg_field_p_bk[0]);
-    mg_field_bk[0] = min;
-    double rk4_min = rk4(t, a, a_p, mg_field_bk, mg_field_p_bk, Omega_f_0);
-    a_p[0] = a_init * Hconf(a[0], C, mg_field_p_bk[0]);
-    mg_field_bk[0] = C;
-    double rk4_C = rk4(t, a, a_p, mg_field_bk, mg_field_p_bk, Omega_f_0);
+  if(type==1){
 
-    if(rk4_min*rk4_C>=0) {
-      min=C;
+    printf("\t-> Bisection target: mg_field_bk.\n", result);
+    if(TEST_MODE==1) printf("\n");
+
+    while(fabs((max-min)/min)>delta_bisection){
+
+      a_p[0] = a_init * Hconf(a[0], min, mg_field_p_bk[0]);
+      mg_field_bk[0] = min;
+      double rk4_min = rk4(t, a, a_p, mg_field_bk, mg_field_p_bk, Omega_f_0);
+      a_p[0] = a_init * Hconf(a[0], C, mg_field_p_bk[0]);
+      mg_field_bk[0] = C;
+      double rk4_C = rk4(t, a, a_p, mg_field_bk, mg_field_p_bk, Omega_f_0);
+
+      if(rk4_min*rk4_C>=0) {
+        min=C;
+      }
+      else {
+        max=C;
+      }
+
+      C=(max+min)/2.;
+
+      if (TEST_MODE == 1) printf("TEST_MODE ON - min: %e , max: %e, C: %e, rk4_min: %e , rk4_C: %e \n", min, max, C, rk4_min, rk4_C);
+
     }
-    else {
-      max=C;
-    }
 
-    C=(max+min)/2.;
+    result = (max+min)/2.;
 
-    if (TEST_MODE == 1) printf("TEST_MODE ON - min: %e , max: %e, C: %e, rk4_min: %e , rk4_C: %e \n", min, max, C, rk4_min, rk4_C);
+    if(TEST_MODE==1) printf("\n");
+    printf("\t-> Result of bisection method is mg_field_bk: %e (internal units).\n", result);
 
   }
 
-  double result = (max+min)/2.;
+  else if(type==2){
 
-  if(TEST_MODE==1) printf("\n");
-  printf("\t-> Result of bisection method is mg_field_bk: %e (internal units).\n", result);
+    printf("\t-> Bisection target: mg_field_p_bk.\n", result);
+    if(TEST_MODE==1) printf("\n");
+
+    while(fabs((max-min)/min)>delta_bisection){
+
+      a_p[0] = a_init * Hconf(a[0], mg_field_bk[0], min);
+      mg_field_p_bk[0] = min;
+      double rk4_min = rk4(t, a, a_p, mg_field_bk, mg_field_p_bk, Omega_f_0);
+      a_p[0] = a_init * Hconf(a[0], mg_field_bk[0], C);
+      mg_field_p_bk[0] = C;
+      double rk4_C = rk4(t, a, a_p, mg_field_bk, mg_field_p_bk, Omega_f_0);
+
+      if(rk4_min*rk4_C>=0) {
+        min=C;
+      }
+      else {
+        max=C;
+      }
+
+      C=(max+min)/2.;
+
+      if (TEST_MODE == 1) printf("TEST_MODE ON - min: %e , max: %e, C: %e, rk4_min: %e , rk4_C: %e \n", min, max, C, rk4_min, rk4_C);
+
+    }
+
+    result = (max+min)/2.;
+
+    if(TEST_MODE==1) printf("\n");
+    printf("\t-> Result of bisection method is mg_field_p_bk: %e (internal units).\n", result);
+
+  }
+
+  else if(type==3){
+
+    printf("\t-> Bisection target: mg_pot_const.\n", result);
+    if(TEST_MODE==1) printf("\n");
+
+    while(fabs((max-min)/min)>delta_bisection){
+
+      mg_pot_const = min;
+      a_p[0] = a_init * Hconf(a[0], mg_field_bk[0], mg_field_p_bk[0]);
+      double rk4_min = rk4(t, a, a_p, mg_field_bk, mg_field_p_bk, Omega_f_0);
+      mg_pot_const = C;
+      a_p[0] = a_init * Hconf(a[0], mg_field_bk[0], mg_field_p_bk[0]);
+      double rk4_C = rk4(t, a, a_p, mg_field_bk, mg_field_p_bk, Omega_f_0);
+
+      if(rk4_min*rk4_C>=0) {
+        min=C;
+      }
+      else {
+        max=C;
+      }
+
+      C=(max+min)/2.;
+
+      if (TEST_MODE == 1) printf("TEST_MODE ON - min: %e , max: %e, C: %e, rk4_min: %e , rk4_C: %e \n", min, max, C, rk4_min, rk4_C);
+
+    }
+
+    result = (max+min)/2.;
+
+    if(TEST_MODE==1) printf("\n");
+    printf("\t-> Result of bisection method is mg_pot_const: %e (internal units).\n", result);
+
+  }
+
+  else{
+    result = 0.;
+  }
 
   return result;
 
@@ -404,31 +503,50 @@ int main() {
 
     // Initial conditions (tau=0)
     a[0] = a_init;
+
+    mg_field_bk[0] = mg_field_bk_0;
     mg_field_p_bk[0] = mg_field_p_bk_0;
 
     printf(" Searching for best initial value for the dark fluid ... \n \n");
-    mg_field_bk[0] = bisection(mg_field_init_min, mg_field_init_max, t, a, a_p, mg_field_bk, mg_field_p_bk, Omega_f_0);
-    a_p[0] = a_init * Hconf(a_init, mg_field_bk[0], mg_field_p_bk[0]);
 
-    if(mg_field_bk[0] > mg_field_init_max*(1.-0.05)) printf("\n\n WARNING: it seems that the initial value is too near the bounds! \n\n");
+    double bisection_result = bisection(bisection_min, bisection_max, t, a, a_p, mg_field_bk, mg_field_p_bk, Omega_f_0,bisection_type);
+
+    if (bisection_type==1) {
+      mg_field_bk[0] = bisection_result;
+      if(mg_field_bk[0] > bisection_max*(1.-0.05)) printf("\n\n WARNING: it seems that the initial value is too near the bounds! \n\n");
+    }
+    else if (bisection_type==2) {
+      mg_field_p_bk[0] = bisection_result;
+      if(mg_field_p_bk[0] > bisection_max*(1.-0.05)) printf("\n\n WARNING: it seems that the initial value is too near the bounds! \n\n");
+    }
+    else if (bisection_type==3) {
+      mg_pot_const = bisection_result;
+      if(mg_pot_const > bisection_max*(1.-0.05)) printf("\n\n WARNING: it seems that the initial value is too near the bounds! \n\n");
+    }
+    else {
+      printf("No bisection type chosen. The evolution will be computed with provided initial conditions.");
+    }
+
+    a_p[0] = a_init * Hconf(a_init, mg_field_bk[0], mg_field_p_bk[0]);
 
     printf("\n\n Evolving the system ...\n");
 
     rk4(t, a, a_p, mg_field_bk, mg_field_p_bk, Omega_f_0);
 
-    char filename[50];
-    sprintf (filename, "coupl_mg_bk.csv");
     int last_int = scan_for_a0(a,a_end);
     int last_int_print = scan_for_a0(a,1.);
 
     if(last_int >= points-1) printf("\n\n WARNING: the a = a_end value seems not to be reached in the result vectors! \n\n");
 
-    double res_factor = sqrt(2. * fourpiG / 3. / (1. + mg_coupl(mg_field_bk[last_int_print]) + mg_field_p_bk[last_int_print] * mg_coupl_p(mg_field_bk[last_int_print])/(a_p[last_int_print]/a[last_int_print]) ));
+    double res_factor = sqrt(2. * fourpiG / 3. / (1. + mg_coupl(mg_field_bk[last_int_print]) ));
 
     printf("\n RESULTS:\n");
     printf("\t-> H0: %f \n", a_p[last_int_print]/a[last_int_print]/res_factor);
     printf("\t-> Age of the Universe: %f Gyr\n", t[last_int_print]/((4*M_PI)/3.) /_H0_/(60.*60.*24.*365.*1e9)*_MPc_over_m_/1000.);
     printf("\t-> Number of points %d \n", last_int);
+
+    char filename[50];
+    sprintf (filename, "coupl_mg_bk.csv");
 
     csv(t, a, a_p, mg_field_bk, mg_field_p_bk, particleHorizonVec, filename);
 
