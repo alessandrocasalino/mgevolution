@@ -64,7 +64,7 @@ int TEST_MODE = 1;
 // Definition of the POTENTIAL
 // For a list of the models see above
 
-double mg_pot_const = 10.;
+double mg_pot_const = 1.;
 double mg_pot_exp = 0.5;
 
 double mg_pot(const double mg_field_bk) {
@@ -75,14 +75,14 @@ double mg_pot(const double mg_field_bk) {
 
 double mg_pot_p(const double mg_field_bk) {
 
-  return - mg_pot_exp * mg_pot_const / pow(mg_field_bk * sqrt(2.*fourpiG), mg_pot_exp + 1.) * sqrt(2.*fourpiG);
+  return - mg_pot_exp * sqrt(2.*fourpiG) * mg_pot_const / pow(mg_field_bk * sqrt(2.*fourpiG), mg_pot_exp + 1.);
 
 }
 
 // Definition of the COUPLING FUNCION
 // For a list of the models see above
 
-double mg_coupl_const = 1e-5;
+double mg_coupl_const = 0.1;
 
 double mg_coupl(const double mg_field_bk) {
 
@@ -195,8 +195,8 @@ void csv(double * t, double * a, double * a_p, double * mg_field_bk, double * mg
       double H = Hconf(a[i],mg_field_bk[i],mg_field_p_bk[i]); // this is the Hubble constant with conformal time
       double H_prime = a_pp_rk4(a[i], a_p[i], mg_field_bk[i], mg_field_p_bk[i]) / a[i] - H * H; // this is Hubble prime with conformal time
 
-      double den_fact = (1. + mg_coupl(mg_field_bk[i]) + 3./2./fourpiG * mg_field_p_bk[i] * mg_coupl_p(mg_field_bk[i])/H);
-      double Omega_df  = (2. * fourpiG / 3.) * ( (mg_field_p_bk[i] * mg_field_p_bk[i] / 2.) + (a[i] * a[i] * mg_pot(mg_field_bk[i]))) /H /H / den_fact;
+      double den_fact = 1. + mg_coupl(mg_field_bk[i]) + mg_field_p_bk[i] * mg_coupl_p(mg_field_bk[i])/H;
+      double Omega_df  = 2. * fourpiG / 3. * ( (mg_field_p_bk[i] * mg_field_p_bk[i] / 2.) + (a[i] * a[i] * mg_pot(mg_field_bk[i]))) /H /H / den_fact;
       double Omega_rad = 2. * fourpiG / 3. * Omega_rad_0 /a[i] /a[i] /H /H / den_fact;
       double Omega_b = 2. * fourpiG / 3. * Omega_b_0 /a[i] /H /H / den_fact;
       double Omega_cdm = 2. * fourpiG / 3. * Omega_cdm_0 /a[i] /H /H / den_fact;
@@ -204,6 +204,8 @@ void csv(double * t, double * a, double * a_p, double * mg_field_bk, double * mg
       //double P_df = -a[i] * a[i] * mg_pot(mg_field_bk[i])+mg_field_p_bk[i]*mg_field_p_bk[i]/2.-mg_coupl_p(mg_field_bk[i])*(H * mg_field_p_bk[i] + a[i] * a[i] * mg_pot_p(mg_field_bk[i]))/2./fourpiG + mg_field_p_bk[i] * mg_field_p_bk[i] * mg_coupl_pp(mg_field_bk[i])/2./fourpiG;
       double P_df   = - mg_pot(mg_field_bk[i]) + mg_field_p_bk[i] * mg_field_p_bk[i]/2./a[i]/a[i] * (1. + mg_coupl_pp(mg_field_bk[i])/fourpiG) - mg_coupl_p(mg_field_bk[i]) * mg_pot_p(mg_field_bk[i])/2./fourpiG;
       double rho_df = mg_pot(mg_field_bk[i]) + mg_field_p_bk[i] * mg_field_p_bk[i]/2./a[i]/a[i];
+
+      printf("%e \n", Omega_df+Omega_rad+Omega_b+Omega_cdm);
 
       double omega_df = P_df/rho_df;
 
@@ -332,7 +334,7 @@ double rk4(double * t, double * a, double * a_p, double * mg_field_bk, double * 
 
     double H        = Hconf(a[j], mg_field_bk[j], mg_field_p_bk[j]);
 
-    double den_fact = (1. + mg_coupl(mg_field_bk[j]) + 3./2./fourpiG * mg_field_p_bk[j] * mg_coupl_p(mg_field_bk[j])/H);
+    double den_fact = 1. + mg_coupl(mg_field_bk[j]) + mg_field_p_bk[j] * mg_coupl_p(mg_field_bk[j])/H;
     double Omega_df  = (2. * fourpiG / 3.) * ( (mg_field_p_bk[j] * mg_field_p_bk[j] / 2.) + (a[j] * a[j] * mg_pot(mg_field_bk[j]))) /H /H / den_fact;
     //double Omega_f  = (2. * fourpiG / 3.) / (1. + mg_coupl(mg_field_bk[j])) * ( (mg_field_p_bk[j] * mg_field_p_bk[j] / 2.) + (a[j] * a[j] * mg_pot(mg_field_bk[j])) - 3./2./fourpiG * H * mg_field_p_bk[j] * mg_coupl_p(mg_field_bk[j])) /H /H;
     return Omega_df  - Omega_f_0;
