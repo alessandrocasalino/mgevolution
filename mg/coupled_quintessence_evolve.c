@@ -40,8 +40,10 @@ double T_CONF = 1.;
 
 // Number of points used in the computation
 int points = (int) 1e6;
-// Max tau
-double max_tau = 200.;
+// Max particle horizon value
+double max_tau = 400.;
+// Min particle horizon value
+double min_tau = 1e-9;
 
 // Raise this value to make the csv file smaller, but decreasing resolution
 // The value inserted is the ratio between the number of values written in a full resolution file / decreased resolution file
@@ -49,7 +51,7 @@ int csv_resolution = 10;
 
 double delta_bisection = 1e-3;
 double mg_field_init_min = 1e-4;
-double mg_field_init_max = 1e4;
+double mg_field_init_max = 1e1;
 
 
 // QUINTESSENCE PARAMETERS
@@ -65,7 +67,7 @@ int TEST_MODE = 1;
 // For a list of the models see above
 
 double mg_pot_const = 1.;
-double mg_pot_exp = 0.5;
+double mg_pot_exp = 0.1;
 
 double mg_pot(const double mg_field_bk) {
 
@@ -82,7 +84,7 @@ double mg_pot_p(const double mg_field_bk) {
 // Definition of the COUPLING FUNCION
 // For a list of the models see above
 
-double mg_coupl_const = 0.1;
+double mg_coupl_const = -0.2;
 
 double mg_coupl(const double mg_field_bk) {
 
@@ -188,7 +190,8 @@ void csv(double * t, double * a, double * a_p, double * mg_field_bk, double * mg
 
     double H_test, H_cosmo = 0.;
 
-    int last_int = scan_for_a0(a,1.);
+    int i_a0 = scan_for_a0(a,1.);
+    double H0 = Hconf(a[i_a0],mg_field_bk[i_a0],mg_field_p_bk[i_a0]);
 
     while( a[i] <= a_end ){
 
@@ -205,14 +208,14 @@ void csv(double * t, double * a, double * a_p, double * mg_field_bk, double * mg
       double P_df   = - mg_pot(mg_field_bk[i]) + mg_field_p_bk[i] * mg_field_p_bk[i]/2./a[i]/a[i] * (1. + mg_coupl_pp(mg_field_bk[i])/fourpiG) - mg_coupl_p(mg_field_bk[i]) * mg_pot_p(mg_field_bk[i])/2./fourpiG;
       double rho_df = mg_pot(mg_field_bk[i]) + mg_field_p_bk[i] * mg_field_p_bk[i]/2./a[i]/a[i];
 
-      printf("%e \n", Omega_df+Omega_rad+Omega_b+Omega_cdm);
+      if(Omega_df+Omega_rad+Omega_b+Omega_cdm > 1.01 || Omega_df+Omega_rad+Omega_b+Omega_cdm < 0.99) printf("WARNING: the fractional density sum is %e at a = %e\n", Omega_df+Omega_rad+Omega_b+Omega_cdm,a[i]);
 
       double omega_df = P_df/rho_df;
 
       if(T_CONF==0) H_prime = ( H_prime - H * H )/a[i]/a[i]; // this is Hubble prime with cosmological time
       if(T_CONF==0) H = H / a[i]; // this it the Hubble constant with cosmological time
 
-      fprintf(fp, "%e, %e, %e, %e, %e, %e, %e, %e", t[i], a[i], H / sqrt(2. * fourpiG / 3. / (1. + mg_coupl(mg_field_bk[last_int]))), H_prime * (1. + mg_coupl(mg_field_bk[last_int]))/ sqrt(2. * fourpiG / 3.) / sqrt(2. * fourpiG / 3.), Omega_df, Omega_rad, Omega_b, Omega_cdm );
+      fprintf(fp, "%e, %e, %e, %e, %e, %e, %e, %e", t[i], a[i], H / H0, H_prime /H0 /H0, Omega_df, Omega_rad, Omega_b, Omega_cdm );
       fprintf(fp, ", %e", omega_df);
 
       fprintf(fp, ", %e", particleHorizonVec[i]);
@@ -225,7 +228,7 @@ void csv(double * t, double * a, double * a_p, double * mg_field_bk, double * mg
         H_test = a_p[i]/a[i];
         if(T_CONF==0) H_test = H_test / a[i];
 
-        fprintf(fp, ", %e", H_test / sqrt(2. * fourpiG / 3. / (1. + mg_coupl(mg_field_bk[last_int]))) );
+        fprintf(fp, ", %e", H_test / sqrt(2. * fourpiG / 3. / (1. + mg_coupl(mg_field_bk[i_a0]) + mg_field_p_bk[i_a0] * mg_coupl_p(mg_field_bk[i_a0])/(a_p[i_a0]/a[i_a0])) ));
 
       }
 
@@ -310,7 +313,7 @@ double rk4(double * t, double * a, double * a_p, double * mg_field_bk, double * 
 
     // Call the function for a logarithmic scale of time
     // We don't start from t = 0 to avoid problems with quintessence potentials
-    logscale10(t,1e-9,max_tau,points);
+    logscale10(t,min_tau,max_tau,points);
 
     while( i < points - 1 ){
 
@@ -420,66 +423,22 @@ int main() {
 
     if(last_int >= points-1) printf("\n\n WARNING: the a = a_end value seems not to be reached in the result vectors! \n\n");
 
+    double res_factor = sqrt(2. * fourpiG / 3. / (1. + mg_coupl(mg_field_bk[last_int_print]) + mg_field_p_bk[last_int_print] * mg_coupl_p(mg_field_bk[last_int_print])/(a_p[last_int_print]/a[last_int_print]) ));
+
     printf("\n RESULTS:\n");
-    printf("\t-> H0: %f \n", a_p[last_int_print]/a[last_int_print]/sqrt(2. * fourpiG / 3. / (1. + mg_coupl(mg_field_bk[last_int_print]))));
-    printf("\t-> number of points %d \n", last_int);
-    //printf("\t-> Age of the Universe: %f Gyr\n", t[last_int] /_H0_/(60.*60.*24.*365.*1e9)*_MPc_over_m_/1000.);
+    printf("\t-> H0: %f \n", a_p[last_int_print]/a[last_int_print]/res_factor);
+    printf("\t-> Age of the Universe: %f Gyr\n", t[last_int_print]/((4*M_PI)/3.) /_H0_/(60.*60.*24.*365.*1e9)*_MPc_over_m_/1000.);
+    printf("\t-> Number of points %d \n", last_int);
 
     csv(t, a, a_p, mg_field_bk, mg_field_p_bk, particleHorizonVec, filename);
 
-    printf("\n The results are saved in '.csv' files. The name is labelled with the value of c, and the model (m).\n");
+    printf("\n The results are saved in '.csv' files.\n");
 
     if(TEST_MODE==1) printf("\n TEST_MODE ON: check the values of H in .csv file. They must be equal!");
 
     printf("\n\t\t----------------------------------------\n");
 
-    double * a_int; double * a_p_int; double * mg_field_bk_int; double * mg_field_p_bk_int; double * particleHorizonVec_int;
-    a_int                   = (double *) malloc(sizeof(double) * last_int);
-    a_p_int                 = (double *) malloc(sizeof(double) * last_int);
-    mg_field_bk_int         = (double *) malloc(sizeof(double) * last_int);
-    mg_field_p_bk_int       = (double *) malloc(sizeof(double) * last_int);
-    particleHorizonVec_int  = (double *) malloc(sizeof(double) * last_int);
-
-    if(!a_int||!a_p_int||!mg_field_bk_int||!mg_field_p_bk_int||!particleHorizonVec_int){
-      printf("Error! The memory cannot be allocated. The program will be terminated.\n");
-      exit(1);
-    }
-
-    memcpy(a_int, a, last_int * sizeof(double));
-    memcpy(a_p_int, a_p, last_int * sizeof(double));
-    memcpy(mg_field_bk_int, mg_field_bk, last_int * sizeof(double));
-    memcpy(mg_field_p_bk_int, mg_field_p_bk, last_int * sizeof(double));
-    memcpy(particleHorizonVec_int, particleHorizonVec, last_int * sizeof(double));
-
     free(a);free(a_p);free(mg_field_bk);free(mg_field_p_bk);free(particleHorizonVec);
-
-    // Spline interpolation with gsl
-    gsl_interp_accel *acc_mg_field = gsl_interp_accel_alloc();
-    gsl_spline * spline_mg_field = gsl_spline_alloc(gsl_interp_cspline,last_int);
-    gsl_interp_accel *acc_mg_field_p = gsl_interp_accel_alloc();
-    gsl_spline * spline_mg_field_p = gsl_spline_alloc(gsl_interp_cspline,last_int);
-    gsl_interp_accel *acc_a_p = gsl_interp_accel_alloc();
-    gsl_spline * spline_a_p = gsl_spline_alloc(gsl_interp_cspline,last_int);
-    gsl_interp_accel *acc_particleHorizon = gsl_interp_accel_alloc();
-    gsl_spline * spline_particleHorizon = gsl_spline_alloc(gsl_interp_cspline,last_int);
-
-    gsl_spline_init(spline_mg_field,a_int,mg_field_bk_int,last_int);
-    gsl_spline_init(spline_mg_field_p,a_int,mg_field_p_bk_int,last_int);
-    gsl_spline_init(spline_a_p,a_int,a_p_int,last_int);
-    gsl_spline_init(spline_particleHorizon,a_int,particleHorizonVec_int,last_int);
-
-    double a_eval = 1e-2;
-    printf("spline eval: %e %e \n",a_eval,gsl_spline_eval(spline_mg_field,a_eval,acc_mg_field));
-    printf("spline eval: %e %e \n",a_eval,gsl_spline_eval(spline_mg_field_p,a_eval,acc_mg_field_p));
-    printf("spline eval: %e %e \n",a_eval,gsl_spline_eval(spline_a_p,a_eval,acc_a_p));
-    printf("spline eval: %e %e \n",a_eval,gsl_spline_eval(spline_particleHorizon,a_eval,acc_particleHorizon));
-    printf("%d %e \n",last_int, particleHorizonVec_int[gsl_interp_bsearch(a_int,a_eval,0,last_int-1)]);
-
-    gsl_spline_free(spline_mg_field);gsl_interp_accel_free(acc_mg_field);
-    gsl_spline_free(spline_mg_field_p);gsl_interp_accel_free(acc_mg_field_p);
-    gsl_spline_free(spline_a_p);gsl_interp_accel_free(acc_a_p);
-    gsl_spline_free(spline_particleHorizon);gsl_interp_accel_free(acc_particleHorizon);
-    free(t);free(a_int);free(a_p_int);free(mg_field_bk_int);free(mg_field_p_bk_int);free(particleHorizonVec_int);
 
     printf("\n");
 
