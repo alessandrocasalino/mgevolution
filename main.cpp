@@ -183,7 +183,14 @@ int main(int argc, char **argv)
 
 	numparam = loadParameterFile(settingsfile, params);
 
+	#ifdef MG
+	// Defining the structure for mg computations
+	mg_cosmology mg_cosmo;
+
+	usedparams = parseMetadata(params, numparam, sim, cosmo, mg_cosmo, ic);
+	#else
 	usedparams = parseMetadata(params, numparam, sim, cosmo, ic);
+	#endif
 
 	COUT << " parsing of settings file completed. " << numparam << " parameters found, " << usedparams << " were used." << endl;
 
@@ -292,9 +299,6 @@ int main(int argc, char **argv)
 
 		COUT << endl << " mgevolution module called." << endl;
 
-		// Defining the structure for mg computations
-		mg_cosmology mg_cosmo;
-
 		// Defining tau for evolution evaluations
 		double mg_tau;
 
@@ -303,7 +307,7 @@ int main(int argc, char **argv)
 		//}
 
 		// Calling function to import mg background data and testing the correct import
-		if( mg_import(a, fourpiG, &mg_cosmo, "mg_bk.csv") ){
+		if( mg_import(a, fourpiG, &mg_cosmo, mg_cosmo.mg_bkg_file) ){
 
 			COUT << " File correctly imported." << endl;
 			#ifdef MGVERBOSE

@@ -294,6 +294,8 @@ struct cosmology
 
 struct mg_cosmology
 {
+	// File name (parsed from settings.ini)
+	char mg_bkg_file[40] = "bk.csv";
 
   // Vector of background values to be filled with mg_import function
   std::vector<double> a_vec;

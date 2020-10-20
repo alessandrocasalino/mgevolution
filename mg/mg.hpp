@@ -7,7 +7,7 @@ bool mg_import(const double a_in, const double fourpiG, mg_cosmology * mg_cosmo,
 
     ifstream fin;
 
-    fin.open("mg_bk.csv", ios::in);
+    fin.open(file_name, ios::in);
 
     // Counter set to -2 to eliminate header and fist row (bad results)
     int i = -2;
